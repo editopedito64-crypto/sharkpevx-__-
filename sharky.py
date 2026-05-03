@@ -1,86 +1,108 @@
-import argparse
 from scanner import scan
-from network import resolver, ping
+from network import resolver, reverse, ping, ip_local
 from network_scan import escanear_red
 from utils import guardar
 
 def banner():
     print(r"""
-   ███████╗██╗  ██╗ █████╗ ██████╗ ██╗  ██╗██╗   ██╗
-   ██╔════╝██║  ██║██╔══██╗██╔══██╗██║ ██╔╝╚██╗ ██╔╝
-   ███████╗███████║███████║██████╔╝█████╔╝  ╚████╔╝ 
-   ╚════██║██╔══██║██╔══██║██╔══██╗██╔═██╗   ╚██╔╝  
-   ███████║██║  ██║██║  ██║██║  ██║██║  ██╗   ██║   
-   ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   
+ ███████╗██╗  ██╗ █████╗ ██████╗ ██╗  ██╗██╗   ██╗
+ ██╔════╝██║  ██║██╔══██╗██╔══██╗██║ ██╔╝╚██╗ ██╔╝
+ ███████╗███████║███████║██████╔╝█████╔╝  ╚████╔╝
+ ╚════██║██╔══██║██╔══██║██╔══██╗██╔═██╗   ╚██╔╝
+ ███████║██║  ██║██║  ██║██║  ██║██║  ██╗   ██║
+ ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝
 
-              SHARKPEVX TOOL PRO+
+        SHARKPEVX TOOL v2
 """)
 
 def parsear_puertos(p):
+    if not p.strip():
+        return [80, 443, 8000]
     if "-" in p:
         inicio, fin = map(int, p.split("-"))
         return list(range(inicio, fin + 1))
-    else:
-        return [int(x) for x in p.split(",")]
+    return [int(x) for x in p.split(",") if x.strip()]
 
 def main():
-    banner()
+    resultados = []
 
-    parser = argparse.ArgumentParser(description="sharkpevx-__ CLI tool")
-    sub = parser.add_subparsers(dest="cmd")
+    while True:
+        banner()
 
-    # scan
-    scan_cmd = sub.add_parser("scan")
-    scan_cmd.add_argument("host")
-    scan_cmd.add_argument("--ports", default="80,443,8000")
-    scan_cmd.add_argument("--timeout", type=float, default=1)
+        print("[1] Escaneo de puertos")
+        print("[2] Escaneo de red")
+        print("[3] Resolver dominio")
+        print("[4] Reverse DNS")
+        print("[5] Ping")
+        print("[6] Info HTTP")
+        print("[7] IP local")
+        print("[8] Guardar resultados")
+        print("[0] Salir")
 
-    # netscan
-    net_cmd = sub.add_parser("netscan")
-    net_cmd.add_argument("base", help="Ej: 192.168.0")
+        opcion = input("\nOpción: ")
 
-    # resolve
-    res_cmd = sub.add_parser("resolve")
-    res_cmd.add_argument("host")
+        if opcion == "1":
+            host = input("Host: ")
+            puertos = input("Puertos (80,443 o 1-1000): ")
+            puertos = parsear_puertos(puertos)
+            resultados = scan(host, puertos)
 
-    # ping
-    ping_cmd = sub.add_parser("ping")
-    ping_cmd.add_argument("host")
-
-    args = parser.parse_args()
-
-    if args.cmd == "scan":
-        puertos = parsear_puertos(args.ports)
-        resultados = scan(args.host, puertos, args.timeout)
-
-        print("\nResultados:\n")
-        if resultados:
+            print("\nResultados:\n")
             for r in resultados:
                 print(f"{r['puerto']} abierto | {r['banner']}")
+
+            input("\nEnter...")
+
+        elif opcion == "2":
+            base = input("Red base (ej: 192.168.0): ")
+            activos = escanear_red(base)
+
+            print("\nHosts activos:\n")
+            for ip in activos:
+                print(ip)
+
+            input("\nEnter...")
+
+        elif opcion == "3":
+            host = input("Dominio: ")
+            print(resolver(host))
+            input("\nEnter...")
+
+        elif opcion == "4":
+            ip = input("IP: ")
+            print(reverse(ip))
+            input("\nEnter...")
+
+        elif opcion == "5":
+            host = input("Host: ")
+            ping(host)
+            input("\nEnter...")
+
+        elif opcion == "6":
+            host = input("Host: ")
+            resultados = scan(host, [80, 443])
+
+            print("\nInfo HTTP:\n")
+            for r in resultados:
+                print(f"{r['puerto']} -> {r['banner']}")
+
+            input("\nEnter...")
+
+        elif opcion == "7":
+            print("IP local:", ip_local())
+            input("\nEnter...")
+
+        elif opcion == "8":
+            guardar(resultados)
+            print("Guardado en resultados.json")
+            input("\nEnter...")
+
+        elif opcion == "0":
+            break
+
         else:
-            print("No se encontraron puertos abiertos")
-
-        guardar(resultados)
-
-    elif args.cmd == "netscan":
-        activos = escanear_red(args.base)
-
-        print("\nHosts activos:\n")
-        if activos:
-            for ip, puertos in activos:
-                print(f"{ip} -> {puertos}")
-        else:
-            print("No se encontraron hosts activos")
-
-    elif args.cmd == "resolve":
-        ip = resolver(args.host)
-        print(ip if ip else "No se pudo resolver")
-
-    elif args.cmd == "ping":
-        ping(args.host)
-
-    else:
-        parser.print_help()
+            print("Opción inválida")
+            input("\nEnter...")
 
 if __name__ == "__main__":
     main()
