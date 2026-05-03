@@ -1,0 +1,7 @@
+[
+    {
+        "puerto": 8000,
+        "estado": "abierto",
+        "banner": "HTTP/1.0 200 OK\r"
+    }
+]
