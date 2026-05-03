@@ -1,48 +1,30 @@
 import socket
-import threading
+from concurrent.futures import ThreadPoolExecutor
 
-def banner_grab(host, puerto):
+def obtener_banner(sock):
     try:
-        s = socket.socket()
-        s.settimeout(1)
-        s.connect((host, puerto))
-        s.send(b"HEAD / HTTP/1.0\r\n\r\n")
-        banner = s.recv(1024).decode(errors="ignore")
-        s.close()
-        return banner.strip().split("\n")[0]
+        sock.send(b"HEAD / HTTP/1.0\r\n\r\n")
+        return sock.recv(1024).decode(errors="ignore").split("\n")[0]
+    except:
+        return "sin banner"
+
+def escanear_puerto(host, puerto, timeout):
+    try:
+        sock = socket.socket()
+        sock.settimeout(timeout)
+        sock.connect((host, puerto))
+        banner = obtener_banner(sock)
+        sock.close()
+        return {"puerto": puerto, "estado": "abierto", "banner": banner}
     except:
         return None
 
-def escanear_puerto(host, puerto, resultados, timeout, sem):
-    with sem:
-        try:
-            s = socket.socket()
-            s.settimeout(timeout)
-
-            if s.connect_ex((host, puerto)) == 0:
-                banner = banner_grab(host, puerto)
-                resultados.append({
-                    "puerto": puerto,
-                    "estado": "abierto",
-                    "banner": banner if banner else "sin banner"
-                })
-
-            s.close()
-        except:
-            pass
-
-def scan(host, puertos, timeout=1, max_threads=100):
+def scan(host, puertos, timeout=1):
     resultados = []
-    hilos = []
-    sem = threading.Semaphore(max_threads)
-
-    for p in puertos:
-        t = threading.Thread(target=escanear_puerto,
-                             args=(host, p, resultados, timeout, sem))
-        t.start()
-        hilos.append(t)
-
-    for t in hilos:
-        t.join()
-
+    with ThreadPoolExecutor(max_workers=100) as executor:
+        futures = [executor.submit(escanear_puerto, host, p, timeout) for p in puertos]
+        for f in futures:
+            r = f.result()
+            if r:
+                resultados.append(r)
     return resultados
